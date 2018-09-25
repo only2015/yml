@@ -1,3 +1,5 @@
+#创建docker应用程序模版 使用例如nginx等等
+
 stages:
    - style
    - test

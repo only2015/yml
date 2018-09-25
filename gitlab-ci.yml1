@@ -1,0 +1,40 @@
+#安卓apk打包使用如下，结合config.toml使用 挂在目录到容器，这样打包就会生成在本地 例如
+#[[runners]]
+#  name = "hz"
+#  url = "http://192.168.33.210"
+#  token = "c6e8308933e7776524d46b641b0b35"
+#  executor = "docker"
+#  builds_dir = "/builds/"
+#  [runners.docker]
+#    tls_verify = false
+#    image = "longge/android"
+#    privileged = false
+#    disable_cache = false
+#    volumes = ["/home/gitlab-runner:/builds"]
+#    shm_size = 0
+#  [runners.cache]
+
+image: longge/android:latest
+
+stages:
+ - test
+ - build
+
+test:
+  script:
+    - gradle assembleDebug
+    - echo "test success!!!"
+  tags:
+    - hzwl
+
+build:
+  script:
+    - gradle assembleRelease
+  artifacts:
+    paths:
+    - app/build/outputs
+  tags:
+    - hzwl
+  only:
+   - master
+

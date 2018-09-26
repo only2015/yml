@@ -1,0 +1,39 @@
+#需添加SSH_PRIVATE_KEY
+
+image: maven:3-jdk-8
+
+before_script:
+  - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+  - eval $(ssh-agent -s)
+  - ssh-add <(echo "$SSH_PRIVATE_KEY")
+  - mkdir -p ~/.ssh
+  - '[[ -f /.dockerinit ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+
+stages:
+  - test
+  - deploy
+
+test:
+  stage: test
+  script: "mvn test"
+
+staging-deploy:
+  stage: deploy
+  script: >
+    mvn package -Dmaven.test.skip=true &&
+    scp target/package.jar user@remote-server:/jar-path/$CI_BUILD_ID.jar &&
+    ssh user@remote-server "deploy_script.sh"
+    
+# 自动测试&手动发布
+
+#有时候我们不希望每次push都引发测试环境重新部署，可以在staging-deploy这个job中加入一个对构建参数的判断，如下
+
+staging-deploy:
+  stage: deploy
+  script: >
+    if [ -n "${UPLOAD_TO_SERVER}" ]; then
+    mvn package -Dmaven.test.skip=true &&
+    scp target/package.jar user@remote-server:/jar-path/$CI_BUILD_ID.jar &&
+    ssh user@remote-server "deploy_script.sh"
+    ; fi
+

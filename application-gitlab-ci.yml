@@ -1,0 +1,64 @@
+#打包Docker镜像
+
+#首先要安装docker ce，参照Docker安装
+#接着需要给gitlab-runner用户赋予docker执行权限，否则在打包是会提示无权限。
+
+sudo usermod -aG docker gitlab-runner
+sudo -u gitlab-runner -H docker info
+#很麻烦，怎么先进行测试，测试通过后再打包？
+#测试是不是使用一个docker runner来做，测试通过后再使用shell runner来打包上传发布？
+#项目根目录下的DockerfileTest，DockerfileProd,gitlab-ci.yml代码如下：
+
+# DockerfileTest
+FROM golang:alpine
+MAINTAINER panzulong "panzulong@gmail.com"
+WORKDIR /go/src
+COPY src /go/src
+cmd ["go","test"]
+# DockerfileProd
+# build product bin
+FROM golang:alpine
+MAINTAINER panzulong "panzulong@gmail.com"
+WORKDIR /go/src
+COPY src /go/src
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
+
+
+# build product image
+FROM alpine:latest
+WORKDIR /root/
+COPY --from=0 /go/src/app .
+EXPOSE 9090
+
+ENTRYPOINT ["./app"]
+
+
+#gitlab-ci.yml 如下
+
+# This file is a template, and might need editing before it works on your project.
+stages:
+    - go-test
+    - build-image 
+go-test:
+    stage: go-test
+    script:
+        - docker build -f DockerfileTest -t test-student:v0.1 . #把测试专用的dockerfile放到src目录中
+        - docker run --rm test-student:v0.1 #进行测试，如果不通过后面就不会执行，如果通过后面继续执行
+    after_script:
+        - docker rmi test-student:v0.1
+    tags:
+        - shell
+
+build-image:
+    stage: build-image
+    before_script:
+        - docker login -u panzl -p **** registry.cacec.com.cn
+    script:
+        - docker build -f DockerfileProd -t registry.cacec.com.cn/ms/student:v0.1 .
+        - docker push registry.cacec.com.cn/ms/student:v0.1
+        - docker images
+    after_script:
+            - docker images|grep none|awk '{print $3}'|xargs docker rmi #为了删除中间生成的那个镜像文件
+    tags:
+        - shell
+

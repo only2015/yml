@@ -1,0 +1,50 @@
+#这里我们只有一个stage是deploy。only指定了只有在master分支push的时候才会被执行。tags是shell，对应了刚才注册runner的时候的tags。
+#最重要的script部分deploy Example_Group Example_Project，这里是一条shell指令，为了方便通用性，deploy是我在服务器上编写的一个脚本，
+#传入参数是Example_Group Example_Project分别是项目组名和项目名。执行这一条指令就能够自动部署到/xxx/Example_Group/Example_Project的服务器目录下。
+#那么随便什么项目都用这个格式去套就好了，这样新项目的自动部署也不需要登录到服务器上去修改了。
+#gitlab-ci.yml
+
+stages:
+- deploy
+deploy:
+  stage: deploy
+  script:
+    - deploy Example_Group Example_Project
+  only:
+    - master
+  tags:
+    - shell
+    
+    
+    
+#deploy脚本
+#在gitlab-runner的~/.local/bin/目录下新建deploy文件
+
+$ su gitlab-runner
+$ mkdir ~/.local/bin
+$ cd ~/.local/bin
+$ touch deploy
+
+#并编辑成如下内容
+
+#!/bin/bash
+if [ $# -ne 2 ]
+then      
+    echo "arguments error!"      
+    exit 1
+else      
+    deploy_path="/var/www/$1/$2"      
+    if [ ! -d "$deploy_path" ]      
+    then              
+            project_path="git@gitlab.example.com:"$1/$2".git"              
+            git clone $project_path $deploy_path      
+    else              
+            cd $deploy_path             
+            git pull      
+    fi
+fi
+
+#加权限 chmod +x ~/.local/bin/deploy
+#并且把~/.local/bin加到$PATH路径中（用户执行命令时候能够查找到这个目录），只要在~/.profile末尾加入这一句话
+#PATH="$HOME/.local/bin:$PATH"
+
